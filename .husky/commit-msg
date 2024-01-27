@@ -3,4 +3,4 @@
 
 echo " "
 echo "📝 Validating commit message..."
-npx --no -- commitlint --edit ${1} --verbose
+npx --no-install commitlint --edit ${1} --verbose
