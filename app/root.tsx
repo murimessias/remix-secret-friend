@@ -1,5 +1,9 @@
 import { cssBundleHref } from '@remix-run/css-bundle'
-import { json, type LinksFunction } from '@remix-run/node'
+import {
+	json,
+	type LinksFunction,
+	type LoaderFunctionArgs,
+} from '@remix-run/node'
 import {
 	Links,
 	LiveReload,
@@ -7,9 +11,14 @@ import {
 	Outlet,
 	Scripts,
 	ScrollRestoration,
+	useLoaderData,
 } from '@remix-run/react'
+import { AuthenticityTokenProvider } from 'remix-utils/csrf/react'
+import { HoneypotProvider } from 'remix-utils/honeypot/react'
 import tailwindStyleSheetUrl from './styles/tailwind.css'
+import { csrf } from './utils/csrf.server'
 import { getEnv } from './utils/env.server'
+import { honeypot } from './utils/honeypot.server'
 
 export const links: LinksFunction = () => {
 	return [
@@ -21,13 +30,31 @@ export const links: LinksFunction = () => {
 	].filter(Boolean)
 }
 
-export function loader() {
-	return json({
-		ENV: getEnv(),
-	})
+export async function loader({ request }: LoaderFunctionArgs) {
+	const [csrfToken, csrfCookieHeader] = await csrf.commitToken(request)
+	const honeyProps = honeypot.getInputProps()
+
+	return json(
+		{
+			csrfToken,
+			ENV: getEnv(),
+			honeyProps,
+		},
+		{
+			headers: {
+				...(csrfCookieHeader ? { 'set-Cookie': csrfCookieHeader } : null),
+			},
+		},
+	)
 }
 
-function Document({ children }: { children: React.ReactNode }) {
+function Document({
+	children,
+	env,
+}: {
+	children: React.ReactNode
+	env?: Record<string, string>
+}) {
 	return (
 		<html lang='en' className='h-full overflow-x-hidden'>
 			<head>
@@ -38,6 +65,11 @@ function Document({ children }: { children: React.ReactNode }) {
 			</head>
 			<body>
 				{children}
+				<script
+					dangerouslySetInnerHTML={{
+						__html: `window.ENV = ${JSON.stringify(env)}`,
+					}}
+				/>
 				<ScrollRestoration />
 				<Scripts />
 				<LiveReload />
@@ -46,10 +78,22 @@ function Document({ children }: { children: React.ReactNode }) {
 	)
 }
 
-export default function App() {
+function App() {
 	return (
 		<Document>
 			<Outlet />
 		</Document>
+	)
+}
+
+export default function AppWithProviders() {
+	const data = useLoaderData<typeof loader>()
+
+	return (
+		<HoneypotProvider {...data.honeyProps}>
+			<AuthenticityTokenProvider token={data.csrfToken}>
+				<App />
+			</AuthenticityTokenProvider>
+		</HoneypotProvider>
 	)
 }

@@ -1,9 +1,11 @@
 import { z } from 'zod'
 
 const schema = z.object({
-	NODE_ENV: z.enum(['production', 'development', 'test'] as const),
 	DATABASE_PATH: z.string(),
 	DATABASE_URL: z.string(),
+	HONEYPOT_SECRET: z.string(),
+	NODE_ENV: z.enum(['production', 'development', 'test'] as const),
+	SESSION_SECRET: z.string(),
 })
 
 declare global {
